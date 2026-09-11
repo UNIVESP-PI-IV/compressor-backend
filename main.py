@@ -63,10 +63,16 @@ class ApiRequestHandler(BaseHTTPRequestHandler):
             self._send_response(404, {'status': 'error', 'message': 'Endpoint not found'})
 
     def _send_response(self, statusCode, payload):
+        response_bytes = json.dumps(payload).encode('utf-8')
+        
         self.send_response(statusCode)
         self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(response_bytes)))
+        self.send_header('Connection', 'close')
         self.end_headers()
-        self.wfile.write(json.dumps(payload).encode('utf-8'))
+        
+        self.wfile.write(response_bytes)
+        self.wfile.flush()
 
 
 def run_server():
@@ -82,3 +88,4 @@ def run_server():
 
 if __name__ == '__main__':
     run_server()
+    
