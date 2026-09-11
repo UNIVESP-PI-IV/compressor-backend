@@ -39,7 +39,7 @@ class ApiRequestHandler(BaseHTTPRequestHandler):
                 connection = mysql.connector.connect(**DB_CONFIG)
                 cursor = connection.cursor()
                 
-                query = "INSERT INTO temperature_readings (temperature) VALUES (%s)"
+                query = "INSERT INTO readings (temperature) VALUES (%s)"
                 cursor.execute(query, (temperature,))
                 
                 connection.commit()
