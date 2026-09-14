@@ -1,5 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import math
 import mysql.connector
 
 DB_CONFIG = {
@@ -27,26 +28,40 @@ class ApiRequestHandler(BaseHTTPRequestHandler):
             try:
                 data = json.loads(body_text)
                 
-                # Extrai a temperatura do JSON
                 temperature = data.get('temperature')
+                vibration = data.get('vibration')
 
                 if temperature is None:
                     print("Campo 'temperature' ausente no payload.")
                     self._send_response(422, {'status': 'error', 'message': 'Missing temperature field'})
                     return
+
+                if not isinstance(vibration, dict) or any(axis not in vibration for axis in ('x', 'y', 'z')):
+                    print("Campos de vibração incompletos no payload.")
+                    self._send_response(422, {'status': 'error', 'message': 'Missing vibration fields'})
+                    return
+
+                accel_x = float(vibration['x'])
+                accel_y = float(vibration['y'])
+                accel_z = float(vibration['z'])
+                rms = math.sqrt((accel_x ** 2 + accel_y ** 2 + accel_z ** 2) / 3) 
                 
                 # Insere o registro no MySQL
                 connection = mysql.connector.connect(**DB_CONFIG)
                 cursor = connection.cursor()
                 
-                query = "INSERT INTO readings (temperature) VALUES (%s)"
-                cursor.execute(query, (temperature,))
+                query = """
+                    INSERT INTO readings
+                        (temperature, accel_x, accel_y, accel_z, rms)
+                    VALUES (%s, %s, %s, %s, %s)
+                """
+                cursor.execute(query, (temperature, accel_x, accel_y, accel_z, rms))
                 
                 connection.commit()
                 cursor.close()
                 connection.close()
                 
-                print(f"Sucesso! Temperatura de {temperature}°C salva no banco de dados.")
+                print(f"Sucesso! Temperatura de {temperature}°C e vibração RMS de {rms} salvas no banco de dados.")
                 self._send_response(201, {'status': 'success', 'message': 'Telemetry recorded'})
                 
             except json.JSONDecodeError:
