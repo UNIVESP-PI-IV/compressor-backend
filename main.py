@@ -1,14 +1,30 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import math
+import os
+from pathlib import Path
+
 import mysql.connector
+from dotenv import load_dotenv
+
+# Carrega o .env ao executar localmente; no deploy, variáveis já definidas no
+# ambiente têm precedência e não são sobrescritas.
+load_dotenv(Path(__file__).resolve().with_name('.env'))
+
+required_db_vars = ('DB_HOST', 'DB_PORT', 'DB_USER', 'DB_PASSWORD', 'DB_NAME')
+missing_db_vars = [name for name in required_db_vars if name not in os.environ]
+if missing_db_vars:
+    raise RuntimeError(
+        'Variáveis de banco ausentes: ' + ', '.join(missing_db_vars)
+        + '. Preencha o .env com base no .env.example ou defina-as no ambiente.'
+    )
 
 DB_CONFIG = {
-    'host': '127.0.0.1',
-    'port': 3308,
-    'user': 'root',
-    'password': '',
-    'database': 'compressor_db'
+    'host': os.environ['DB_HOST'],
+    'port': int(os.environ['DB_PORT']),
+    'user': os.environ['DB_USER'],
+    'password': os.environ['DB_PASSWORD'],
+    'database': os.environ['DB_NAME']
 }
 
 # Calibração inicial estimada a partir dos três pacotes enviados com o sensor
