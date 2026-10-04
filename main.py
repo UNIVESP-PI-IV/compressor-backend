@@ -4,11 +4,28 @@ import math
 import mysql.connector
 
 DB_CONFIG = {
-    'host': 'localhost',
+    'host': '127.0.0.1',
+    'port': 3308,
     'user': 'root',
     'password': '',
     'database': 'compressor_db'
 }
+
+# Calibração inicial estimada a partir dos três pacotes enviados com o sensor
+# parado (excluindo a primeira leitura, que aparenta ser um pico transitório).
+# Subtraímos o offset de cada eixo para que a posição de repouso fique próxima
+# de zero. Refaça essa média com várias leituras estáveis se o sensor mudar de
+# posição, unidade ou montagem.
+VIBRATION_ZERO_OFFSETS = {
+    'x': -0.00048828125,
+    'y': 0.0152994791667,
+    'z': 0.0231119791667,
+}
+
+# Valores corrigidos abaixo deste limite são tratados como ruído de repouso.
+# O limite usa a mesma unidade enviada pelo ESP32; vibrações menores que ele
+# também serão zeradas, portanto ajuste-o conforme a sensibilidade desejada.
+VIBRATION_NOISE_FLOOR = 0.01
 
 class ApiRequestHandler(BaseHTTPRequestHandler):
 
@@ -41,9 +58,14 @@ class ApiRequestHandler(BaseHTTPRequestHandler):
                     self._send_response(422, {'status': 'error', 'message': 'Missing vibration fields'})
                     return
 
-                accel_x = float(vibration['x'])
-                accel_y = float(vibration['y'])
-                accel_z = float(vibration['z'])
+                # Remove o desvio de repouso calibrado e elimina pequenas
+                # oscilações residuais antes de calcular RMS e salvar os eixos.
+                accel_x = float(vibration['x']) - VIBRATION_ZERO_OFFSETS['x']
+                accel_y = float(vibration['y']) - VIBRATION_ZERO_OFFSETS['y']
+                accel_z = float(vibration['z']) - VIBRATION_ZERO_OFFSETS['z']
+                accel_x = 0.0 if abs(accel_x) < VIBRATION_NOISE_FLOOR else accel_x
+                accel_y = 0.0 if abs(accel_y) < VIBRATION_NOISE_FLOOR else accel_y
+                accel_z = 0.0 if abs(accel_z) < VIBRATION_NOISE_FLOOR else accel_z
                 rms = math.sqrt((accel_x ** 2 + accel_y ** 2 + accel_z ** 2) / 3) 
                 
                 # Insere o registro no MySQL
@@ -103,4 +125,3 @@ def run_server():
 
 if __name__ == '__main__':
     run_server()
-    
